@@ -22,11 +22,15 @@ int main() {
     dht_begin(&dht);
 
     while (1) {
+        if (! dht_read(&dht)) {
+            sprintf(buf, "[%lu] read failed!", millis());
+            serial_print(buf);
+            continue;
+        }
+
         t = dht_read_temperature(&dht, F);
         h = dht_read_humidity(&dht);
-        sprintf(buf, "[%lu] ", millis());
-        serial_print(buf);
-        sprintf(buf, "t: %d h: %d", t, h);
+        sprintf(buf, "[%lu] t: %d h: %d", millis(), t, h);
         serial_println(buf);
         
         now =  millis();
