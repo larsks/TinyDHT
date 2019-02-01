@@ -24,14 +24,20 @@ int main() {
     while (1) {
         if (! dht_read(&dht)) {
             sprintf(buf, "[%lu] read failed!", millis());
-            serial_print(buf);
-            continue;
+            serial_println(buf);
+            goto next_measure;
         }
 
         t = dht_read_temperature(&dht, F);
         h = dht_read_humidity(&dht);
         sprintf(buf, "[%lu] t: %d h: %d", millis(), t, h);
         serial_println(buf);
+
+next_measure:
+        for (int i=0; i<40; i++) {
+            sprintf(buf, "[%d]: %d", i, dht.debug[i]);
+            serial_println(buf);
+        }
         
         now =  millis();
         while (millis() - now <= 2000);

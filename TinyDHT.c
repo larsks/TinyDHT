@@ -136,7 +136,7 @@ dht_humidity_t dht_read_humidity(DHT *dht) {  //  0-100 %
 //! An expressoin that returns the current value of the data line
 #define DHT_SIGNAL SIGNAL_HIGH
 
-bool dht_read(DHT *dht) {
+uint8_t dht_read(DHT *dht) {
     uint8_t counter,
             laststate,
             i,

@@ -37,6 +37,8 @@
 #define BAD_HUM    -1  //!< Bad humitidy reading
 #define BAD_TEMP -999  //!< Bad temperature reading
 
+#define DHT_HIGH_THRESHOLD 13
+
 //! Used to provide a temperature scale to `dht_read_temperature()`.
 typedef enum TEMPSCALE {C, F} TEMPSCALE;
 
@@ -50,6 +52,7 @@ typedef int16_t dht_temperature_t;
 typedef struct DHT {
     bool valid;         //!< `true` if most recent DHT read was successful
     uint8_t data[5];    //!< data collected from DHT sensor
+    uint8_t debug[50];
     uint8_t pin,        //!< pin to which DHT sensor is attached
             type;       //!< one of (`DHT22`, `DHT21`, `DHT21`, `AM2301`)
 } DHT;
@@ -64,7 +67,7 @@ void dht_begin(DHT *dht);
 //! Read values from the DHT sensor. This is based on the timing
 //! specifications found in
 //! <https://cdn-shop.adafruit.com/datasheets/Digital+humidity+and+temperature+sensor+AM2302.pdf>
-bool dht_read(DHT *dht);
+uint8_t dht_read(DHT *dht);
 
 //! Return temperature component of previous `dht_read` operation.
 dht_temperature_t dht_read_temperature(DHT *dht, TEMPSCALE scale);
