@@ -4,11 +4,11 @@ AVR_BAUD    ?= 19200
 AVR_PORT    ?= /dev/ttyACM0
 FUSE_EXT    ?= 0xff
 FUSE_HIGH   ?= 0xdf
-FUSE_LOW    ?= 0x62
+FUSE_LOW    ?= 0xe2
 PROGRAMMER  ?= -c arduino 
 
 DEVICE      ?= attiny85
-CLOCK       ?= 1000000
+CLOCK       ?= 8000000
 FUSES       ?= -U lfuse:w:$(FUSE_LOW):m -U hfuse:w:$(FUSE_HIGH):m -U efuse:w:$(FUSE_EXT):m 
 PORT	    ?= -P $(AVR_PORT) -b $(AVR_BAUD)
 AVRDUDE     = avrdude -v $(PORT) $(PROGRAMMER) -p $(DEVICE) $(AVR_EXTRA_ARGS)
