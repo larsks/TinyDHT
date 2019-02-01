@@ -67,6 +67,10 @@ void dht_new(DHT *dht, uint8_t pin, uint8_t type) {
 }
 
 void dht_begin(DHT *dht) {
+#ifdef DHT_DEBUG
+    DDRA |= 1<<PORTA0;
+#endif
+
     DHTDDR &= ~(1<<dht->pin);   // configure dht->pin as input
     DHTPORTREG |= 1<<dht->pin;  // enable internal pull-up
     dht->valid = false;
@@ -153,6 +157,7 @@ uint8_t dht_read(DHT *dht) {
     // Perform our reads inside an `ATOMIC_BLOCK` to prevent interrupts
     // from disrupting the timing.
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+
         // pull high for 30 us
         DHTPORTREG |= 1<<dht->pin;
         _delay_us(30);
@@ -164,6 +169,9 @@ uint8_t dht_read(DHT *dht) {
          * Start receiving data
          */
 
+#ifdef DHT_DEBUG
+    PORTA |= 1<<PORTA0;
+#endif
         // The DHT will respond with 2 bytes of temperature data,
         // 2 bytes of humidity data, and a 1 byte checksum, for a total
         // of 5 bytes == 40 bits.
@@ -186,7 +194,7 @@ uint8_t dht_read(DHT *dht) {
         //
         // While the documentation tells us 28us for a low and 70us for a
         // high, the value of the `counter` variable is typically around
-        // 6 for a low and 20 for a high.
+        // 6 for a low and 18 for a high.
         laststate = 1<<dht->pin;
         for (i=0; i < DHT_MAX_TRANSITIONS; i++) {
             counter = 0;
@@ -196,19 +204,24 @@ uint8_t dht_read(DHT *dht) {
             }
             laststate = DHT_SIGNAL;
 
+#ifdef DHT_DEBUG
+                dht->debug[j] = counter;
+#endif
             if ((i >= 4) && (i%2 == 0)) {
                 dht->data[j/8] <<= 1;
                 if (counter > DHT_HIGH_THRESHOLD)
                     dht->data[j/8] |= 1;
                 j++;
             }
+#ifdef DHT_DEBUG
+    PORTA &= ~(1<<PORTA0);
+#endif
 
             continue;
 
 exit_loop:
             break;
         }
-
     }
 
     // verify checksum
@@ -227,5 +240,6 @@ exit_loop:
     }
 
     // checksum verification failed
+    dht->valid = false;
     return false;
 }

@@ -34,11 +34,16 @@ int main() {
         serial_println(buf);
 
 next_measure:
-        for (int i=0; i<40; i++) {
-            sprintf(buf, "[%d]: %d", i, dht.debug[i]);
-            serial_println(buf);
+#ifdef DHT_DEBUG
+        for (int i=0; i<5; i++) {
+            for (int j=0; j<8; j++) {
+                sprintf(buf, "%02d ", dht.debug[i*5 + j]);
+                serial_print(buf);
+            }
+            serial_println("");
         }
-        
+#endif
+
         now =  millis();
         while (millis() - now <= 2000);
     }

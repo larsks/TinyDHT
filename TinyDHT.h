@@ -52,9 +52,11 @@ typedef int16_t dht_temperature_t;
 typedef struct DHT {
     bool valid;         //!< `true` if most recent DHT read was successful
     uint8_t data[5];    //!< data collected from DHT sensor
-    uint8_t debug[50];
     uint8_t pin,        //!< pin to which DHT sensor is attached
             type;       //!< one of (`DHT22`, `DHT21`, `DHT21`, `AM2301`)
+#ifdef DHT_DEBUG
+    uint8_t debug[50];
+#endif
 } DHT;
 
 //! Initialize a new DHT object
