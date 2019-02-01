@@ -3,3 +3,6 @@
 *.o
 *.pre
 GNUmakefile
+*.dep
+*.elf
+*.hex

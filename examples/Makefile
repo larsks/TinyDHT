@@ -1,4 +1,5 @@
-PROGNAME	= dhttest
+PROGNAME	= tinydht
+VPATH		= ..
 
 AVR_BAUD    ?= 19200
 AVR_PORT    ?= /dev/ttyACM0
@@ -11,12 +12,13 @@ DEVICE      ?= attiny85
 CLOCK       ?= 8000000
 FUSES       ?= -U lfuse:w:$(FUSE_LOW):m -U hfuse:w:$(FUSE_HIGH):m -U efuse:w:$(FUSE_EXT):m 
 PORT	    ?= -P $(AVR_PORT) -b $(AVR_BAUD)
-AVRDUDE     = avrdude -v $(PORT) $(PROGRAMMER) -p $(DEVICE) $(AVR_EXTRA_ARGS)
 
-OFLAG		?= -Os
-CC	= avr-gcc
-CFLAGS	+= -std=c99 -Wall $(DEBUG) $(OFLAG) -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) --short-enums
-CPPFLAGS += -Iavr-serial -DSERIAL_PROVIDE_MILLIS $(DEFINES)
+AVRDUDE     = avrdude -v $(PORT) $(PROGRAMMER) -p $(DEVICE) $(AVR_EXTRA_ARGS)
+CC          = avr-gcc
+
+OFLAG       ?= -Os
+CFLAGS      += -std=c99 -Wall $(DEBUG) $(OFLAG) -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) --short-enums
+CPPFLAGS    += -I.. -Iavr-serial -DSERIAL_PROVIDE_MILLIS $(EXTRA_CPP_FLAGS)
 
 OBJS += \
 	TinyDHT.o \
