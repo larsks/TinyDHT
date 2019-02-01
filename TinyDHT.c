@@ -104,52 +104,39 @@ bool dht_read(DHT *dht) {
     dht->data[0] = dht->data[1] = dht->data[2] = dht->data[3] = dht->data[4] = 0;
 
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        // pull line low for 5 ms
-        DHTDDR |= 1<<dht->pin;
+        // pull low for 5 ms
+        DHTDDR |= 1<<dht->pin;          // configure dht->pin as output
         DHTPORTREG &= ~(1<<dht->pin);
         delay(5);
     
-        // pull high for 30 seconds
+        // pull high for 30 us
         DHTPORTREG |= 1<<dht->pin;
         delayMicroseconds(30);
 
-        // configure dht->pin as input
-        DHTDDR &= ~(1<<dht->pin);
+        DHTDDR &= ~(1<<dht->pin);       // configure dht->pin as input
 
-        // read in timings
-        for ( i=0; i< MAXTIMINGS; i++) {
-            counter = 0;
-            while ((DHTPINREG & (1<<dht->pin)) == laststate) {
-                counter++;
-                delayMicroseconds(1);
-                if (counter == 255) {
-                    break;
-                }
-            }
-            laststate = DHTPINREG & 1<<dht->pin;
+        // wait for start signal
 
-            if (counter == 255) break;
-
-            // ignore first 3 transitions
-            if ((i >= 4) && (i%2 == 0)) {
-                // shove each bit into the storage bytes
-                dht->data[j/8] <<= 1;
-                if (counter > dht->count)
-                    dht->data[j/8] |= 1;
-                j++;
-            }
-
+        // signal goes low for ~ 80us
+        counter = 0;
+        while (!(DHTPINREG & (1<<dht->pin))) {
+            if (counter++ > 100) goto failed;
+            delayMicroseconds(1);
         }
-    }
 
-    // check we read 40 bits and that the checksum matches
-    if ((j >= 40) && 
-            (dht->data[4] == ((dht->data[0] +
-                               dht->data[1] +
-                               dht->data[2] +
-                               dht->data[3]) & 0xFF)) ) {
+        // signal goes high ~ 80us
+        counter = 0;
+        while ((DHTPINREG & (1<<dht->pin))) {
+            if (counter++ > 100) goto failed;
+            delayMicroseconds(1);
+        }
+
+        // start receiving data bits
+
+succeeded:
         return true;
     }
 
+failed:
     return false;
 }
