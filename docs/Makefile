@@ -6,11 +6,16 @@ ifdef PUSH
 PUSHFLAG = -p
 endif
 
-all:
+all: docs
+
+docs: export PROJECT_NUMBER = $(shell git log -1 --format='%h (%cd)')
+docs:
 	doxygen
 
-publish: all
+publish: docs
 	ghp-import -nf $(PUSHFLAG) $(MESSAGEFLAG) html
 
 clean:
 	rm -rf html
+
+.PHONY: all docs publish
