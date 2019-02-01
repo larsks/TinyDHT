@@ -1,9 +1,20 @@
-/* TinyDHT library 
-   Integer version of the Adafruit DHT library for the
-   Trinket and Gemma mini microcontrollers
-   MIT license
-   written by Adafruit Industries
-   */
+/**
+ * \file TinyDHT.c
+ *
+ * attiny84/85 driver to read temperature and humidity from a DHT22/11 sensor.
+ *
+ * This started out as a simple port of Adafruit's TinyDHT code from Arudino to
+ * straight avr-libc, but it didn't worked and I ended up making a number of
+ * changes to the code.
+ *
+ * The original file header was:
+ *
+ *     TinyDHT library 
+ *     Integer version of the Adafruit DHT library for the
+ *     Trinket and Gemma mini microcontrollers
+ *     MIT license
+ *     written by Adafruit Industries
+ */
 
 #include <string.h>
 
@@ -13,10 +24,47 @@
 
 #include "TinyDHT.h"
 
-void dht_new(DHT *dht, uint8_t pin, uint8_t type, uint8_t count) {
+//! \defgroup PINCONFIG Pin Configuration
+//!
+//! TinyDHT uses pin `PORTB0` by default. If you can select a new pin
+//! on `PORTB` by simply passing a new pin value to the `dht_new()`
+//! function.
+//!
+//! If you wish to use a pin on `PORTA`, the code has to use a
+//! different register to set the pin mode (`DDRA`), to set the pin 
+//! value (`PORTA`), and to read the pin value (`PINA`).  Rather than
+//! having you redefine them individually, you can set `DHTPORTNAME`
+//! to `A`:
+//!
+//!     #define DHTPORTNAME 'A'
+//!
+//! This will set `DHTPORTREG`, `DHTPINREG`, and `DHTDDR` to the
+//! appropriate values for a pin on `PORTA`.
+//!
+//! @{
+#ifndef DHTPORTNAME
+#define DHTPORTNAME 'B'
+#endif
+
+#if DHTPORTNAME == 'B'
+#define DHTPORTREG PORTB
+#define DHTPINREG PINB
+#define DHTDDR DDRB
+#else
+#define DHTPORTREG PORTA
+#define DHTPINREG PINA
+#define DHTDDR DDRA
+#endif
+//! @}
+
+//! A boolean expression that is `true` if `dht->pin` is low
+#define SIGNAL_LOW (!(DHTPINREG & (1<<dht->pin)))
+//! A boolean expression that is `true` if `dht->pin` is high
+#define SIGNAL_HIGH (DHTPINREG & (1<<dht->pin))
+
+void dht_new(DHT *dht, uint8_t pin, uint8_t type) {
     dht->pin = pin;
     dht->type = type;
-    dht->count = count;
     dht->valid = false;
 }
 
@@ -81,43 +129,48 @@ dht_humidity_t dht_read_humidity(DHT *dht) {  //  0-100 %
     return BAD_HUM;
 }
 
-#define SIGNAL_LOW (!(DHTPINREG & (1<<dht->pin)))
-#define SIGNAL_HIGH (DHTPINREG & (1<<dht->pin))
-
 bool dht_read(DHT *dht) {
     uint8_t counter = 0;
 
+    // zero out data field
     dht->data[0] = dht->data[1] = dht->data[2] = dht->data[3] = dht->data[4] = 0;
 
     // pull low for 5 ms
     DHTDDR |= 1<<dht->pin;          // configure dht->pin as output
     DHTPORTREG &= ~(1<<dht->pin);
-    delay(5);
+    _delay_ms(5);
     
+    // Perform our reads inside an `ATOMIC_BLOCK` to prevent interrupts
+    // from disrupting the timing.
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         // pull high for 30 us
         DHTPORTREG |= 1<<dht->pin;
-        delayMicroseconds(30);
+        _delay_us(30);
 
         DHTDDR &= ~(1<<dht->pin);       // configure dht->pin as input
 
-        // wait for start signal
+        /*
+         * Wait for start signal
+         */
 
         // signal goes low for ~ 80us
         counter = 0;
         while (SIGNAL_LOW) {
             if (counter++ > 100) goto failed;
-            delayMicroseconds(1);
+            _delay_us(1);
         }
 
         // signal goes high ~ 80us
         counter = 0;
         while (SIGNAL_HIGH) {
             if (counter++ > 100) goto failed;
-            delayMicroseconds(1);
+            _delay_us(1);
         }
 
-        // start receiving data
+        /*
+         * Start receiving data
+         */
+
         // the DHT will response with 2 bytes of temperature data,
         // 2 bytes of humidity data, and a 1 byte checksum, for a total
         // of 5 bytes.
@@ -130,7 +183,7 @@ bool dht_read(DHT *dht) {
                 counter = 0;
                 while (SIGNAL_LOW) {
                     if (counter++ > 100) goto failed;
-                    delayMicroseconds(1);
+                    _delay_us(1);
                 }
 
                 // signal goes high to indicate bit value:
@@ -139,7 +192,7 @@ bool dht_read(DHT *dht) {
                 counter = 0;
                 while (SIGNAL_HIGH) {
                     if (counter++ > 100) goto failed;
-                    delayMicroseconds(1);
+                    _delay_us(1);
                 }
 
                 dht->data[i] <<= 1;
@@ -149,6 +202,7 @@ bool dht_read(DHT *dht) {
         }
     }
 
+    // verify checksum
     if (dht->data[4] != ((
                     dht->data[0] +
                     dht->data[1] +

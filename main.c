@@ -18,7 +18,7 @@ int main() {
     serial_println("* DHT22 Sensor Example");
     serial_println("*");
 
-    dht_new(&dht, PORTB1, DHT22, DHT_DEFAULT_COUNT); 
+    dht_new(&dht, PORTB1, DHT22);
     dht_begin(&dht);
 
     while (1) {

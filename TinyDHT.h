@@ -1,65 +1,78 @@
+/**
+ * \file TinyDHT.h
+ *
+ * attiny84/85 driver to read temperature and humidity from a DHT22/11 sensor.
+ *
+ * This started out as a simple port of Adafruit's TinyDHT code from Arudino to
+ * straight avr-libc, but it didn't worked and I ended up making a number of
+ * changes to the code.
+ *
+ * The original file header was:
+ *
+ *     TinyDHT library 
+ *     Integer version of the Adafruit DHT library for the
+ *     Trinket and Gemma mini microcontrollers
+ *     MIT license
+ *     written by Adafruit Industries
+ */
+
 #ifndef DHT_H
 #define DHT_H
 
 #include <stdint.h>
 #include <stdbool.h>
-
 #include <avr/io.h>
-#include <util/delay.h>
 
-/* Tiny DHT library
-Uses integer math to save space on Trinket/Gemma
-
-MIT license
-written by Adafruit Industries
-*/
-
-#define delay(x) (_delay_ms(x))
-#define delayMicroseconds(x) (_delay_us(x))
-
-// how many timing transitions we need to keep track of. 2 * number bits + extra
-#define MAXTIMINGS 85
-
+//! \defgroup SENSOR Sensor type
+//!
+//! Constants for setting your sensor model
+//!
+//! @{
 #define DHT11 11
 #define DHT22 22
 #define DHT21 21
 #define AM2301 21
+//! @}
 
-// NAN code in DHT library takes space, define bad values here
-#define BAD_HUM    -1  // Bad humitidy reading
-#define BAD_TEMP -999  // Bad temperature reading
+#define BAD_HUM    -1  //!< Bad humitidy reading
+#define BAD_TEMP -999  //!< Bad temperature reading
 
-#ifndef DHTPORTNAME
-#define DHTPORTNAME 'B'
-#endif
-
-#if DHTPORTNAME == 'B'
-#define DHTPORTREG PORTB
-#define DHTPINREG PINB
-#define DHTDDR DDRB
-#else
-#define DHTPORTREG PORTA
-#define DHTPINREG PINA
-#define DHTDDR DDRA
-#endif
-
-#define DHT_DEFAULT_COUNT 6
-
+//! Used to provide a temperature scale to `dht_read_temperature()`.
 typedef enum TEMPSCALE {C, F} TEMPSCALE;
+
+//! Return type of `dht_read_humidity()` function
 typedef int8_t dht_humidity_t;
+
+//! Return type of `dht_read_temperature()` function
 typedef int16_t dht_temperature_t;
 
+//! Reperesents a single DHT sensor
 typedef struct DHT {
-    bool valid;
-    uint8_t data[5];
-    uint8_t pin, type, count;
+    bool valid;         //!< `true` if most recent DHT read was successful
+    uint8_t data[5];    //!< data collected from DHT sensor
+    uint8_t pin,        //!< pin to which DHT sensor is attached
+            type;       //!< one of (`DHT22`, `DHT21`, `DHT21`, `AM2301`)
 } DHT;
 
-void dht_new(DHT *dht, uint8_t pin, uint8_t type, uint8_t count);
+//! Initialize a new DHT object
+void dht_new(DHT *dht, uint8_t pin, uint8_t type);
+
+//! Prepare DHT for reading. Call this once before you start
+//! reading values.
 void dht_begin(DHT *dht);
-dht_temperature_t dht_read_temperature(DHT *dht, TEMPSCALE scale);
-dht_humidity_t dht_read_humidity(DHT *dht);
-int16_t convertCtoF(int16_t);
+
+//! Read values from the DHT sensor. This is based on the timing
+//! specifications found in
+//! <https://cdn-shop.adafruit.com/datasheets/Digital+humidity+and+temperature+sensor+AM2302.pdf>
 bool dht_read(DHT *dht);
+
+//! Return temperature component of previous `dht_read` operation.
+dht_temperature_t dht_read_temperature(DHT *dht, TEMPSCALE scale);
+
+//! Return humidity component of previous `dht_read` operation.
+dht_humidity_t dht_read_humidity(DHT *dht);
+
+//! Convert Celsius to Farenheit
+int16_t convertCtoF(int16_t);
 
 #endif
