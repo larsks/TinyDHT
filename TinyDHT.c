@@ -21,6 +21,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/atomic.h>
+#include <util/delay.h>
 
 #include "TinyDHT.h"
 
@@ -57,10 +58,7 @@
 #endif
 //! @}
 
-//! A boolean expression that is `true` if `dht->pin` is low
-#define SIGNAL_LOW (!(DHTPINREG & (1<<dht->pin)))
-//! A boolean expression that is `true` if `dht->pin` is high
-#define SIGNAL_HIGH (DHTPINREG & (1<<dht->pin))
+#define DHT_MAX_TRANSITIONS 85
 
 void dht_new(DHT *dht, uint8_t pin, uint8_t type) {
     dht->pin = pin;
@@ -129,8 +127,20 @@ dht_humidity_t dht_read_humidity(DHT *dht) {  //  0-100 %
     return BAD_HUM;
 }
 
+//! A boolean expression that is `true` if `dht->pin` is low
+#define SIGNAL_LOW (!(DHTPINREG & (1<<dht->pin)))
+
+//! A boolean expression that is `true` if `dht->pin` is high
+#define SIGNAL_HIGH (DHTPINREG & (1<<dht->pin))
+
+//! An expressoin that returns the current value of the data line
+#define DHT_SIGNAL SIGNAL_HIGH
+
 bool dht_read(DHT *dht) {
-    uint8_t counter = 0;
+    uint8_t counter,
+            laststate,
+            i,
+            j=0;
 
     // zero out data field
     dht->data[0] = dht->data[1] = dht->data[2] = dht->data[3] = dht->data[4] = 0;
@@ -138,7 +148,7 @@ bool dht_read(DHT *dht) {
     // pull low for 5 ms
     DHTDDR |= 1<<dht->pin;          // configure dht->pin as output
     DHTPORTREG &= ~(1<<dht->pin);
-    _delay_ms(5);
+    _delay_ms(5);                   // pull line low for > 1ms
     
     // Perform our reads inside an `ATOMIC_BLOCK` to prevent interrupts
     // from disrupting the timing.
@@ -147,73 +157,75 @@ bool dht_read(DHT *dht) {
         DHTPORTREG |= 1<<dht->pin;
         _delay_us(30);
 
-        DHTDDR &= ~(1<<dht->pin);       // configure dht->pin as input
-
-        /*
-         * Wait for start signal
-         */
-
-        // signal goes low for ~ 80us
-        counter = 0;
-        while (SIGNAL_LOW) {
-            if (counter++ > 100) goto failed;
-            _delay_us(1);
-        }
-
-        // signal goes high ~ 80us
-        counter = 0;
-        while (SIGNAL_HIGH) {
-            if (counter++ > 100) goto failed;
-            _delay_us(1);
-        }
+        // configure dht->pin as input
+        DHTDDR &= ~(1<<dht->pin);
 
         /*
          * Start receiving data
          */
 
-        // the DHT will response with 2 bytes of temperature data,
+        // The DHT will respond with 2 bytes of temperature data,
         // 2 bytes of humidity data, and a 1 byte checksum, for a total
-        // of 5 bytes.
-        for (int i=0; i<5; i++) {
+        // of 5 bytes == 40 bits.
+        //
+        // The signal from the DHT starts with the following sentintel
+        // sequence:
+        //
+        // \ low for 80us /-------------- ...
+        //  \____________/ high for 80us
+        //
+        // And then continues with a sequence for each bit that looks like:
+        //
+        // \ low for 50us /------------- ...
+        //  \____________/  high for 28us (0) or 70us (1)
+        //
+        // This repeats for each bit. We just count transitions, ignore the
+        // first four (the sentinel + the start signal for the first bit),
+        // and then only check the timing on even transitions, which will be
+        // the high component of each bit.
+        //
+        // While the documentation tells us 28us for a low and 70us for a
+        // high, the value of the `counter` variable is typically around
+        // 6 for a low and 20 for a high.
+        laststate = 1<<dht->pin;
+        for (i=0; i < DHT_MAX_TRANSITIONS; i++) {
+            counter = 0;
+            while (DHT_SIGNAL == laststate) {
+                if (++counter == 255) goto exit_loop;
+                _delay_us(1);
+            }
+            laststate = DHT_SIGNAL;
 
-            // collect the bits
-            for (int j=0; j<8; j++) {
-
-                // signal goes low for ~ 50us to indicate start of bit
-                counter = 0;
-                while (SIGNAL_LOW) {
-                    if (counter++ > 100) goto failed;
-                    _delay_us(1);
-                }
-
-                // signal goes high to indicate bit value:
-                // ~30us = 0
-                // ~70us = 1
-                counter = 0;
-                while (SIGNAL_HIGH) {
-                    if (counter++ > 100) goto failed;
-                    _delay_us(1);
-                }
-
-                dht->data[i] <<= 1;
-                dht->data[i] |= (counter > 12) ? 1 : 0;
+            if ((i >= 4) && (i%2 == 0)) {
+                dht->data[j/8] <<= 1;
+                if (counter > DHT_HIGH_THRESHOLD)
+                    dht->data[j/8] |= 1;
+                j++;
             }
 
+            continue;
+
+exit_loop:
+            break;
         }
+
     }
 
     // verify checksum
-    if (dht->data[4] != ((
-                    dht->data[0] +
-                    dht->data[1] +
-                    dht->data[2] +
-                    dht->data[3]) & 0xFF)) {
-        goto failed;
+    if (
+            (j >= 40) &&
+            (
+             dht->data[4] == ((
+                     dht->data[0] +
+                     dht->data[1] +
+                     dht->data[2] +
+                     dht->data[3]) & 0xFF)
+            )
+       ) {
+        dht->valid = true;
+        return true;
     }
 
-    dht->valid = true;
-    return true;
-
-failed:
+    // checksum verification failed
     return false;
 }
