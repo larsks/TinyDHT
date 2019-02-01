@@ -57,7 +57,11 @@
 #endif
 //! @}
 
+//! How many level transitions to expect when reading sensor response
 #define DHT_MAX_TRANSITIONS 83
+
+//! Minimum pulse length to interpret as a binary 1
+#define DHT_HIGH_THRESHOLD 13
 
 void dht_new(DHT *dht, uint8_t pin, uint8_t type) {
     dht->pin = pin;
@@ -66,10 +70,6 @@ void dht_new(DHT *dht, uint8_t pin, uint8_t type) {
 }
 
 void dht_begin(DHT *dht) {
-#ifdef DHT_DEBUG
-    DDRA |= 1<<PORTA0;
-#endif
-
     DHTDDR &= ~(1<<dht->pin);   // configure dht->pin as input
     DHTPORTREG |= 1<<dht->pin;  // enable internal pull-up
     dht->valid = false;
@@ -153,10 +153,6 @@ bool dht_read(DHT *dht) {
     DHTPORTREG &= ~(1<<dht->pin);
     _delay_ms(5);                   // pull line low for > 1ms
     
-#ifdef DHT_DEBUG
-    PORTA |= 1<<PORTA0;
-#endif
-
     // Perform our reads inside an `ATOMIC_BLOCK` to prevent interrupts
     // from disrupting the timing.
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
@@ -204,9 +200,6 @@ bool dht_read(DHT *dht) {
             }
             laststate = DHT_SIGNAL;
 
-#ifdef DHT_DEBUG
-                dht->debug[j] = counter;
-#endif
             if ((i >= 4) && (i%2 == 0)) {
                 dht->data[j/8] <<= 1;
                 if (counter > DHT_HIGH_THRESHOLD)
@@ -220,10 +213,6 @@ exit_loop:
             break;
         }
     }
-
-#ifdef DHT_DEBUG
-    PORTA &= ~(1<<PORTA0);
-#endif
 
     // verify checksum
     if (
