@@ -58,7 +58,7 @@
 #endif
 //! @}
 
-#define DHT_MAX_TRANSITIONS 85
+#define DHT_MAX_TRANSITIONS 83
 
 void dht_new(DHT *dht, uint8_t pin, uint8_t type) {
     dht->pin = pin;
@@ -154,6 +154,10 @@ uint8_t dht_read(DHT *dht) {
     DHTPORTREG &= ~(1<<dht->pin);
     _delay_ms(5);                   // pull line low for > 1ms
     
+#ifdef DHT_DEBUG
+    PORTA |= 1<<PORTA0;
+#endif
+
     // Perform our reads inside an `ATOMIC_BLOCK` to prevent interrupts
     // from disrupting the timing.
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
@@ -169,9 +173,6 @@ uint8_t dht_read(DHT *dht) {
          * Start receiving data
          */
 
-#ifdef DHT_DEBUG
-    PORTA |= 1<<PORTA0;
-#endif
         // The DHT will respond with 2 bytes of temperature data,
         // 2 bytes of humidity data, and a 1 byte checksum, for a total
         // of 5 bytes == 40 bits.
@@ -213,9 +214,6 @@ uint8_t dht_read(DHT *dht) {
                     dht->data[j/8] |= 1;
                 j++;
             }
-#ifdef DHT_DEBUG
-    PORTA &= ~(1<<PORTA0);
-#endif
 
             continue;
 
@@ -223,6 +221,10 @@ exit_loop:
             break;
         }
     }
+
+#ifdef DHT_DEBUG
+    PORTA &= ~(1<<PORTA0);
+#endif
 
     // verify checksum
     if (
