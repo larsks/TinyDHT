@@ -22,16 +22,15 @@ int main() {
     dht_begin(&dht);
 
     while (1) {
-        if (dht_read(&dht)) {
-            serial_println("read okay");
-        } else {
-            serial_println("read failed");
-        }
-        for (int i=0; i<6; i++) {
-            sprintf(buf, "data[%d] = %d", i, dht.data[i]);
-            serial_println(buf);
-        }
-        delay(2000);
+        t = dht_read_temperature(&dht, F);
+        h = dht_read_humidity(&dht);
+        sprintf(buf, "[%lu] ", millis());
+        serial_print(buf);
+        sprintf(buf, "t: %d h: %d", t, h);
+        serial_println(buf);
+        
+        now =  millis();
+        while (millis() - now <= 2000);
     }
     serial_disable();
 }

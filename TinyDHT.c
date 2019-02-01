@@ -20,6 +20,8 @@ void dht_new(DHT *dht, uint8_t pin, uint8_t type, uint8_t count) {
 }
 
 void dht_begin(DHT *dht) {
+    DDRA |= 1<<PORTA0;
+    PORTA &= ~(1<<PORTA0);
     DHTDDR &= ~(1<<dht->pin);   // configure dht->pin as input
     DHTPORTREG |= 1<<dht->pin;  // enable internal pull-up
     dht->lastreadtime = 0;
@@ -80,15 +82,12 @@ dht_humidity_t dht_read_humidity(DHT *dht) {  //  0-100 %
     return BAD_HUM;
 }
 
-bool dht_read(DHT *dht) {
-    uint8_t laststate = 1<<dht->pin;
-    uint8_t counter = 0;
-    uint8_t j = 0, i;
-    millis_t currenttime;
+#define SIGNAL_LOW (!(DHTPINREG & (1<<dht->pin)))
+#define SIGNAL_HIGH (DHTPINREG & (1<<dht->pin))
 
-    // pull the pin high and wait 250 milliseconds
-    DHTPORTREG |= 1<<dht->pin;
-    delay(250);
+bool dht_read(DHT *dht) {
+    uint8_t counter = 0;
+    millis_t currenttime;
 
     currenttime = millis();
     if (currenttime < dht->lastreadtime) {
@@ -103,6 +102,7 @@ bool dht_read(DHT *dht) {
 
     dht->data[0] = dht->data[1] = dht->data[2] = dht->data[3] = dht->data[4] = 0;
 
+    PORTA |= 1<<PORTA0;
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         // pull low for 5 ms
         DHTDDR |= 1<<dht->pin;          // configure dht->pin as output
@@ -119,24 +119,58 @@ bool dht_read(DHT *dht) {
 
         // signal goes low for ~ 80us
         counter = 0;
-        while (!(DHTPINREG & (1<<dht->pin))) {
+        while (SIGNAL_LOW) {
             if (counter++ > 100) goto failed;
             delayMicroseconds(1);
         }
 
         // signal goes high ~ 80us
         counter = 0;
-        while ((DHTPINREG & (1<<dht->pin))) {
+        while (SIGNAL_HIGH) {
             if (counter++ > 100) goto failed;
             delayMicroseconds(1);
         }
 
         // start receiving data bits
+        for (int i=0; i<5; i++) {
+            for (int j=0; j<8; j++) { 
 
-succeeded:
-        return true;
+                // signal goes low to indicate start of bit
+                counter = 0;
+                while (SIGNAL_LOW) {
+                    if (counter++ > 100) goto failed;
+                    delayMicroseconds(1);
+                }
+
+                // signal goes high to indicate bit value:
+                // ~30us = 0
+                // ~70us = 1
+                counter = 0;
+                while (SIGNAL_HIGH) {
+                    if (counter++ > 100) goto failed;
+                    delayMicroseconds(1);
+                }
+
+                dht->data[i] <<= 1;
+                dht->data[i] |= (counter > 15) ? 1 : 0;
+                dht->debug[(8*i) + j] = counter;
+            }
+        }
     }
 
+    if (dht->data[4] != ((
+                    dht->data[0] +
+                    dht->data[1] +
+                    dht->data[2] +
+                    dht->data[3]) & 0xFF)) {
+        goto failed;
+    }
+
+succeeded:
+    PORTA &= ~(1<<PORTA0);
+    return true;
+
 failed:
+    PORTA &= ~(1<<PORTA0);
     return false;
 }
