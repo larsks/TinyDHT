@@ -1,0 +1,3 @@
+[submodule "avr-serial"]
+	path = avr-serial
+	url = https://github.com/larsks/avr-serial

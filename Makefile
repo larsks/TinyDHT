@@ -16,11 +16,11 @@ AVRDUDE     = avrdude -v $(PORT) $(PROGRAMMER) -p $(DEVICE) $(AVR_EXTRA_ARGS)
 OFLAG		?= -Os
 CC	= avr-gcc
 CFLAGS	+= -std=c99 -Wall $(DEBUG) $(OFLAG) -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) --short-enums
-CPPFLAGS += -DSERIAL_PROVIDE_MILLIS $(DEFINES)
+CPPFLAGS += -Iavr-serial -DSERIAL_PROVIDE_MILLIS $(DEFINES)
 
 OBJS += \
 	TinyDHT.o \
-	serial.o \
+	avr-serial/serial.o \
 	main.o
 
 DEPS = $(OBJS:.o=.dep)
