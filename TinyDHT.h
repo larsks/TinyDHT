@@ -50,11 +50,9 @@ typedef int8_t dht_humidity_t;
 typedef int16_t dht_temperature_t;
 
 typedef struct DHT {
-    bool firstreading;
-    uint8_t data[6];
+    bool valid;
+    uint8_t data[5];
     uint8_t pin, type, count;
-    unsigned long lastreadtime;
-    uint8_t debug[40];
 } DHT;
 
 void dht_new(DHT *dht, uint8_t pin, uint8_t type, uint8_t count);

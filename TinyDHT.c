@@ -5,32 +5,31 @@
    written by Adafruit Industries
    */
 
+#include <string.h>
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/atomic.h>
 
-#include "millis.h"
 #include "TinyDHT.h"
 
 void dht_new(DHT *dht, uint8_t pin, uint8_t type, uint8_t count) {
     dht->pin = pin;
     dht->type = type;
     dht->count = count;
-    dht->firstreading = true;
+    dht->valid = false;
 }
 
 void dht_begin(DHT *dht) {
-    DDRA |= 1<<PORTA0;
-    PORTA &= ~(1<<PORTA0);
     DHTDDR &= ~(1<<dht->pin);   // configure dht->pin as input
     DHTPORTREG |= 1<<dht->pin;  // enable internal pull-up
-    dht->lastreadtime = 0;
+    dht->valid = false;
 }
 
 dht_temperature_t dht_read_temperature(DHT *dht, TEMPSCALE scale) {
     int16_t f;
 
-    if (dht_read(dht)) {
+    if (dht->valid) {
         switch (dht->type) {
             case DHT11:
                 f = (int16_t) dht->data[2];
@@ -63,7 +62,7 @@ int16_t convertCtoF(int16_t c) {
 dht_humidity_t dht_read_humidity(DHT *dht) {  //  0-100 %
     uint8_t f;
     uint16_t f2;  // bigger to allow for math operations
-    if (dht_read(dht)) {
+    if (dht->valid) {
         switch (dht->type) {
             case DHT11:
                 f = dht->data[0];
@@ -87,28 +86,15 @@ dht_humidity_t dht_read_humidity(DHT *dht) {  //  0-100 %
 
 bool dht_read(DHT *dht) {
     uint8_t counter = 0;
-    millis_t currenttime;
-
-    currenttime = millis();
-    if (currenttime < dht->lastreadtime) {
-        // ie there was a rollover
-        dht->lastreadtime = 0;
-    }
-    if (!dht->firstreading && ((currenttime - dht->lastreadtime) < 2000)) {
-        return true;
-    }
-    dht->firstreading = false;
-    dht->lastreadtime = millis();
 
     dht->data[0] = dht->data[1] = dht->data[2] = dht->data[3] = dht->data[4] = 0;
 
-    PORTA |= 1<<PORTA0;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        // pull low for 5 ms
-        DHTDDR |= 1<<dht->pin;          // configure dht->pin as output
-        DHTPORTREG &= ~(1<<dht->pin);
-        delay(5);
+    // pull low for 5 ms
+    DHTDDR |= 1<<dht->pin;          // configure dht->pin as output
+    DHTPORTREG &= ~(1<<dht->pin);
+    delay(5);
     
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         // pull high for 30 us
         DHTPORTREG |= 1<<dht->pin;
         delayMicroseconds(30);
@@ -131,11 +117,16 @@ bool dht_read(DHT *dht) {
             delayMicroseconds(1);
         }
 
-        // start receiving data bits
+        // start receiving data
+        // the DHT will response with 2 bytes of temperature data,
+        // 2 bytes of humidity data, and a 1 byte checksum, for a total
+        // of 5 bytes.
         for (int i=0; i<5; i++) {
-            for (int j=0; j<8; j++) { 
 
-                // signal goes low to indicate start of bit
+            // collect the bits
+            for (int j=0; j<8; j++) {
+
+                // signal goes low for ~ 50us to indicate start of bit
                 counter = 0;
                 while (SIGNAL_LOW) {
                     if (counter++ > 100) goto failed;
@@ -152,9 +143,9 @@ bool dht_read(DHT *dht) {
                 }
 
                 dht->data[i] <<= 1;
-                dht->data[i] |= (counter > 15) ? 1 : 0;
-                dht->debug[(8*i) + j] = counter;
+                dht->data[i] |= (counter > 12) ? 1 : 0;
             }
+
         }
     }
 
@@ -166,11 +157,9 @@ bool dht_read(DHT *dht) {
         goto failed;
     }
 
-succeeded:
-    PORTA &= ~(1<<PORTA0);
+    dht->valid = true;
     return true;
 
 failed:
-    PORTA &= ~(1<<PORTA0);
     return false;
 }
