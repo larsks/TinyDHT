@@ -18,7 +18,7 @@ CC          = avr-gcc
 
 OFLAG       ?= -Os
 CFLAGS      += -std=c99 -Wall $(DEBUG) $(OFLAG) -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) --short-enums
-CPPFLAGS    += -I.. -Iavr-serial -DSERIAL_PROVIDE_MILLIS $(EXTRA_CPP_FLAGS)
+CPPFLAGS    += -I.. -Iavr-serial $(EXTRA_CPP_FLAGS)
 
 OBJS += \
 	TinyDHT.o \

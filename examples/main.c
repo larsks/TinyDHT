@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <util/delay.h>
 
 #include "serial.h"
 #include "TinyDHT.h"
@@ -8,7 +9,6 @@ DHT dht;
 int main() {
     dht_temperature_t t;
     dht_humidity_t h;
-    millis_t now;
 
     // for string formatting
     char buf[40];
@@ -28,22 +28,18 @@ int main() {
     while (1) {
         // read sensor
         if (! dht_read(&dht)) {
-            sprintf(buf, "[%lu] read failed!", millis());
-            serial_println(buf);
+            serial_println("* read failed!");
             goto next_measure;
         }
 
         // get sensor values and write them out
         t = dht_read_temperature(&dht, F);
         h = dht_read_humidity(&dht);
-        sprintf(buf, "[%lu] t: %d h: %d", millis(), t, h);
+        sprintf(buf, "t: %d h: %d", t, h);
         serial_println(buf);
 
 next_measure:
-
-        // wait two seconds before next read
-        now =  millis();
-        while (millis() - now <= 2000);
+        _delay_ms(3000);
     }
     serial_disable();
 }
