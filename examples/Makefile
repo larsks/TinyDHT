@@ -51,6 +51,9 @@ flash:	all
 fuse:
 	$(AVRDUDE) $(FUSES)
 
+checkfuse:
+	$(AVRDUDE)
+
 make: flash fuse
 
 clean:
