@@ -168,29 +168,29 @@ bool dht_read(DHT *dht) {
          * Start receiving data
          */
 
-        // The DHT will respond with 2 bytes of temperature data,
-        // 2 bytes of humidity data, and a 1 byte checksum, for a total
-        // of 5 bytes == 40 bits.
+        //! The DHT will respond with 2 bytes of temperature data,
+        //! 2 bytes of humidity data, and a 1 byte checksum, for a total
+        //! of 5 bytes == 40 bits.
+        //!
+        //! The signal from the DHT starts with the following sentintel
+        //! sequence:
+        //!
+        //!     \ low for 80us /-------------- ...
+        //!      \____________/ high for 80us
+        //!
+        //! And then continues with a sequence for each bit that looks like:
+        //!
+        //!     \ low for 50us /------------- ...
+        //!      \____________/  high for 28us (0) or 70us (1)
+        //!
+        //! This repeats for each bit. We just count transitions, ignore the
+        //! first four (the sentinel + the start signal for the first bit),
+        //! and then only check the timing on even transitions, which will be
+        //! the high component of each bit.
         //
-        // The signal from the DHT starts with the following sentintel
-        // sequence:
-        //
-        // \ low for 80us /-------------- ...
-        //  \____________/ high for 80us
-        //
-        // And then continues with a sequence for each bit that looks like:
-        //
-        // \ low for 50us /------------- ...
-        //  \____________/  high for 28us (0) or 70us (1)
-        //
-        // This repeats for each bit. We just count transitions, ignore the
-        // first four (the sentinel + the start signal for the first bit),
-        // and then only check the timing on even transitions, which will be
-        // the high component of each bit.
-        //
-        // While the documentation tells us 28us for a low and 70us for a
-        // high, the value of the `counter` variable is typically around
-        // 6 for a low and 18 for a high.
+        //! While the documentation tells us 28us for a low and 70us for a
+        //! high, the value of the `counter` variable is typically around
+        //! 6 for a low and 18 for a high.
         laststate = 1<<dht->pin;
         for (i=0; i < DHT_MAX_TRANSITIONS; i++) {
             counter = 0;
