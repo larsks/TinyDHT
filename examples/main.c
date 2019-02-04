@@ -15,7 +15,7 @@ int main() {
 
     // enable serial support
     serial_init();
-    serial_enable();
+    serial_begin();
 
     serial_println("*");
     serial_println("* TinyDHT Example");
@@ -41,5 +41,5 @@ int main() {
 next_measure:
         _delay_ms(3000);
     }
-    serial_disable();
+    serial_end();
 }
