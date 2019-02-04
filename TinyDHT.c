@@ -57,6 +57,9 @@
 #endif
 //! @}
 
+//! Convenience macro for referring to DHT data pin
+#define DHT_PIN (1<<dht->pin)
+
 //! How many level transitions to expect when reading sensor response
 #define DHT_MAX_TRANSITIONS 83
 
@@ -70,8 +73,8 @@ void dht_new(DHT *dht, uint8_t pin, uint8_t type) {
 }
 
 void dht_begin(DHT *dht) {
-    DHTDDR &= ~(1<<dht->pin);   // configure dht->pin as input
-    DHTPORTREG |= 1<<dht->pin;  // enable internal pull-up
+    DHTDDR &= ~(DHT_PIN);   // configure dht->pin as input
+    DHTPORTREG |= DHT_PIN;  // enable internal pull-up
     dht->valid = false;
 }
 
@@ -131,10 +134,10 @@ dht_humidity_t dht_read_humidity(DHT *dht) {  //  0-100 %
 }
 
 //! A boolean expression that is `true` if `dht->pin` is low
-#define SIGNAL_LOW (!(DHTPINREG & (1<<dht->pin)))
+#define SIGNAL_LOW (!(DHTPINREG & (DHT_PIN)))
 
 //! A boolean expression that is `true` if `dht->pin` is high
-#define SIGNAL_HIGH (DHTPINREG & (1<<dht->pin))
+#define SIGNAL_HIGH (DHTPINREG & (DHT_PIN))
 
 //! An expressoin that returns the current value of the data line
 #define DHT_SIGNAL SIGNAL_HIGH
@@ -149,8 +152,8 @@ bool dht_read(DHT *dht) {
     dht->data[0] = dht->data[1] = dht->data[2] = dht->data[3] = dht->data[4] = 0;
 
     // pull low for 5 ms
-    DHTDDR |= 1<<dht->pin;          // configure dht->pin as output
-    DHTPORTREG &= ~(1<<dht->pin);
+    DHTDDR |= DHT_PIN;          // configure dht->pin as output
+    DHTPORTREG &= ~(DHT_PIN);
     _delay_ms(5);                   // pull line low for > 1ms
     
     // Perform our reads inside an `ATOMIC_BLOCK` to prevent interrupts
@@ -158,11 +161,11 @@ bool dht_read(DHT *dht) {
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 
         // pull high for 30 us
-        DHTPORTREG |= 1<<dht->pin;
+        DHTPORTREG |= DHT_PIN;
         _delay_us(30);
 
         // configure dht->pin as input
-        DHTDDR &= ~(1<<dht->pin);
+        DHTDDR &= ~(DHT_PIN);
 
         /*
          * Start receiving data
@@ -191,7 +194,7 @@ bool dht_read(DHT *dht) {
         //! While the documentation tells us 28us for a low and 70us for a
         //! high, the value of the `counter` variable is typically around
         //! 6 for a low and 18 for a high.
-        laststate = 1<<dht->pin;
+        laststate = DHT_PIN;
         for (i=0; i < DHT_MAX_TRANSITIONS; i++) {
             counter = 0;
             while (DHT_SIGNAL == laststate) {
